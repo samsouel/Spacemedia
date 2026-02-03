@@ -105,7 +105,7 @@ const rocketImg = new Image();
 rocketImg.src = "/assets/rocket.png";
 
 const asteroidImg = new Image();
-asteroidImg.src = "../assets/asteroid.png";
+asteroidImg.src = "/assets/asteroid.png";
 
 const itemImgs = [1, 2, 3, 4].map((i) => {
   const img = new Image();
@@ -692,4 +692,5 @@ gotEl.textContent = "0";
 distEl.textContent = "0";
 initStars();
 showBriefing();
+
 
