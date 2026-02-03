@@ -64,13 +64,13 @@ window.addEventListener("keydown", (e) => {
 /* -------------------------
    PATHS (ADAPTE SI BESOIN)
 ------------------------- */
-const ROCKET_SRC = "/assets/rocket.png";
-const ASTEROID_SRC = "/assets/asteroid.png";
+const ROCKET_SRC = "../assets/rocket.png";
+const ASTEROID_SRC = "../assets/asteroid.png";
 const ITEM_SRCs = [
-  "/assets/items/mitem1.png", // Brainstorming
-  "/assets/items/mitem2.png", // Croquis
-  "/assets/items/mitem3.png", // Illustrator
-  "/assets/items/mitem4.png", // Charte graphique
+  "../assets/items/mitem1.png", // Brainstorming
+  "../assets/items/mitem2.png", // Croquis
+  "../assets/items/mitem3.png", // Illustrator
+  "../assets/items/mitem4.png", // Charte graphique
 ];
 
 /* -------------------------
@@ -872,3 +872,4 @@ function loop(t) {
 ------------------------- */
 resize();
 showBriefing();
+
