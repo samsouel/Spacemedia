@@ -51,15 +51,15 @@ if (backBtn) backBtn.addEventListener("click", () => (window.location.href = "..
 
 /* ---------------- Assets ---------------- */
 const ASSETS = {
-  ship: "/assets/rocket.png",
-  missile: "/assets/missile.png",
-  asteroid: "/assets/asteroid.png",
-  bonus: "/assets/bonus.png",
+  ship: "assets/rocket.png",
+  missile: "assets/missile.png",
+  asteroid: "assets/asteroid.png",
+  bonus: "assets/bonus.png",
   items: [
-    "/assets/items/gitem1.png",
-    "/assets/items/gitem2.png",
-    "/assets/items/gitem3.png",
-    "/assets/items/gitem4.png",
+    "assets/items/gitem1.png",
+    "assets/items/gitem2.png",
+    "assets/items/gitem3.png",
+    "assets/items/gitem4.png",
   ]
 };
 
@@ -602,3 +602,4 @@ function loop(t) {
 /* init */
 resize();
 showBriefing();
+
