@@ -1,0 +1,990 @@
+/* =========================================================
+   marketing.js — Space Surfer (runner type Subway)
+   - 3 lanes + pseudo-3D
+   - rocket fixed; objects move from top to bottom
+   - coins drawn in JS
+   - obstacles: SMALL (jump), BIG (no jump), ARCH (duck)
+   - items (4): random lane, 1 at a time; missed -> comes back first
+   - speed slow -> faster progressively
+   - cleanup at bottom (no accumulation)
+   - SPACE: invincible 10s consumes 1 shield (not stack)
+   - NEW:
+     ✅ Player hitbox = BASE only
+     ✅ Asteroid hitbox: BIG full / SMALL base only
+     ✅ Depth draw: some objects in front, rocket behind when jumping
+     ✅ Jump animation: in air -> rocket.png (flames), same hitbox
+   ========================================================= */
+
+const frame = document.getElementById("frame");
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+const coinsEl = document.getElementById("coins");
+const shieldsEl = document.getElementById("shields");
+const invEl = document.getElementById("inv");
+const scoreEl = document.getElementById("score");
+
+const backBtn = document.getElementById("back");
+const shopBtn = document.getElementById("shopBtn");
+
+const briefing = document.getElementById("briefing");
+const startBtn = document.getElementById("startMission");
+
+const loseScreen = document.getElementById("loseScreen");
+const loseText = document.getElementById("loseText");
+const restartLose = document.getElementById("restartLose");
+
+const shopScreen = document.getElementById("shopScreen");
+const closeShop = document.getElementById("closeShop");
+const shopCoinsEl = document.getElementById("shopCoins");
+const shopShieldsEl = document.getElementById("shopShields");
+const skinGrid = document.getElementById("skinGrid");
+const buyShieldBtn = document.getElementById("buyShield");
+
+if (backBtn) backBtn.addEventListener("click", () => (window.location.href = "../index.html"));
+
+/* ---------------- Assets ---------------- */
+const ASSETS = {
+  asteroid: "/assets/asteroid.png",
+  rocketFlame: "/assets/rocket.png",
+  rocketBase: "/assets/rocket2.png",
+  items: [
+    "/assets/items/item1.png",
+    "/assets/items/item2.png",
+    "/assets/items/item3.png",
+    "/assets/items/item4.png",
+  ],
+  skins: [
+    { id:"rocket2", name:"Classique", src:"/assets/rocket2.png", cost:0   },
+    { id:"rocket",  name:"Flamme",    src:"/assets/rocket.png",  cost:150 },
+    { id:"rocket3", name:"Noir",      src:"/assets/rocket3.png", cost:300 },
+    { id:"rocket4", name:"Néon",      src:"/assets/rocket4.png", cost:450 },
+  ],
+};
+
+function loadImg(src){ const i = new Image(); i.src = src; return i; }
+const imgAst = loadImg(ASSETS.asteroid);
+const imgRocketFlame = loadImg(ASSETS.rocketFlame);
+const imgRocketBase = loadImg(ASSETS.rocketBase);
+const itemImgs = ASSETS.items.map(loadImg);
+const skinImgs = new Map(ASSETS.skins.map(s => [s.id, loadImg(s.src)]));
+
+/* ---------------- Save ---------------- */
+const STORE_KEY = "space_surfer_marketing_depth_hitbox";
+function loadSave(){
+  try{ const raw = localStorage.getItem(STORE_KEY); return raw ? JSON.parse(raw) : null; }
+  catch{ return null; }
+}
+function saveNow(){ localStorage.setItem(STORE_KEY, JSON.stringify(save)); }
+
+let save = loadSave() || {
+  coins: 0,
+  shields: 0,
+  ownedSkins: ["rocket2"],
+  equippedSkin: "rocket2",
+};
+saveNow();
+
+/* ---------------- HUD/Shop ---------------- */
+function refreshHUD(){
+  if (coinsEl) coinsEl.textContent = String(save.coins);
+  if (shieldsEl) shieldsEl.textContent = String(save.shields);
+}
+function refreshShop(){
+  if (shopCoinsEl) shopCoinsEl.textContent = String(save.coins);
+  if (shopShieldsEl) shopShieldsEl.textContent = String(save.shields);
+  if (!skinGrid) return;
+
+  skinGrid.innerHTML = "";
+  for (const s of ASSETS.skins){
+    const owned = save.ownedSkins.includes(s.id);
+    const equipped = save.equippedSkin === s.id;
+
+    const card = document.createElement("div");
+    card.className = "shopItem";
+
+    const title = document.createElement("div");
+    title.className = "shopTitle";
+    title.textContent = `${s.name} ${equipped ? "✓" : ""}`;
+    card.appendChild(title);
+
+    const desc = document.createElement("div");
+    desc.className = "shopDesc";
+    desc.textContent = owned ? "Déjà acheté." : `Prix: ${s.cost} pièces`;
+    card.appendChild(desc);
+
+    const actions = document.createElement("div");
+    actions.className = "shopActions";
+
+    const tag = document.createElement("span");
+    tag.className = "tag";
+    tag.textContent = owned ? "Possédé" : "Verrouillé";
+    actions.appendChild(tag);
+
+    const btn = document.createElement("button");
+    btn.className = "primaryBtn";
+    btn.type = "button";
+
+    if (s.cost === 0 && !owned){
+      save.ownedSkins.push(s.id);
+      save.equippedSkin = s.id;
+      saveNow();
+    }
+
+    if (owned){
+      btn.textContent = equipped ? "Équipé" : "Équiper";
+      btn.disabled = equipped;
+      btn.addEventListener("click", ()=>{
+        save.equippedSkin = s.id;
+        saveNow();
+        refreshShop();
+      });
+    } else {
+      btn.textContent = `Acheter (${s.cost})`;
+      btn.addEventListener("click", ()=>{
+        if (save.coins < s.cost) return;
+        save.coins -= s.cost;
+        save.ownedSkins.push(s.id);
+        save.equippedSkin = s.id;
+        saveNow();
+        refreshShop();
+        refreshHUD();
+      });
+    }
+
+    actions.appendChild(btn);
+    card.appendChild(actions);
+    skinGrid.appendChild(card);
+  }
+}
+
+function openShop(){
+  running = false;
+  if (shopScreen) shopScreen.classList.remove("hidden");
+  refreshShop();
+  refreshHUD();
+}
+function closeShopUI(){
+  if (shopScreen) shopScreen.classList.add("hidden");
+  if (!gameStartedOnce) showBriefing();
+  else {
+    running = true;
+    lastT = performance.now();
+    requestAnimationFrame(loop);
+  }
+}
+if (shopBtn) shopBtn.addEventListener("click", openShop);
+if (closeShop) closeShop.addEventListener("click", closeShopUI);
+
+if (buyShieldBtn){
+  buyShieldBtn.addEventListener("click", ()=>{
+    const cost = 50;
+    if (save.coins < cost) return;
+    save.coins -= cost;
+    save.shields += 1;
+    saveNow();
+    refreshShop();
+    refreshHUD();
+  });
+}
+
+/* ---------------- Canvas sizing ---------------- */
+const W = { w: 360, h: 740 };
+function resize(){
+  const r = frame.getBoundingClientRect();
+  const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  canvas.width = Math.floor(r.width * dpr);
+  canvas.height = Math.floor(r.height * dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  W.w = r.width; W.h = r.height;
+  initStars();
+}
+window.addEventListener("resize", resize);
+
+/* ---------------- Stars ---------------- */
+let stars = [];
+function initStars(){
+  stars = [];
+  const count = 170;
+  for (let i=0;i<count;i++){
+    stars.push({
+      x: Math.random()*W.w,
+      y: Math.random()*W.h,
+      s: Math.random()<0.86?1:2,
+      a: 0.18 + Math.random()*0.65,
+      sp: 30 + Math.random()*150
+    });
+  }
+}
+function updateStars(dt, speedFactor){
+  for (const st of stars){
+    st.y += st.sp * speedFactor * dt;
+    if (st.y > W.h){
+      st.y = -5;
+      st.x = Math.random()*W.w;
+      st.sp = 30 + Math.random()*150;
+      st.a = 0.18 + Math.random()*0.65;
+      st.s = Math.random()<0.86?1:2;
+    }
+  }
+}
+
+/* ---------------- Helpers ---------------- */
+function clamp(v,a,b){ return Math.max(a, Math.min(b,v)); }
+function lerp(a,b,t){ return a + (b-a)*t; }
+
+/* ---------------- Track (linear -> constant visual speed) ---------------- */
+const TRACK = {
+  horizonY: 0.18,
+  baseY: 0.88,
+  topHalfWidth: 0.18,
+  baseHalfWidth: 0.44
+};
+const LANES = [-1, 0, 1];
+const PLAYER_ANCHOR_Y = 0.78; // forward on track
+
+function yAt(p){
+  return lerp(W.h*TRACK.horizonY, W.h*TRACK.baseY, p);
+}
+function halfWidthAt(p){
+  return lerp(W.w*TRACK.topHalfWidth, W.w*TRACK.baseHalfWidth, p);
+}
+function laneX(lane, p){
+  const hw = halfWidthAt(p);
+  const step = hw / 1.25;
+  return W.w*0.5 + lane*step;
+}
+function scaleAt(p){
+  return lerp(0.50, 1.18, p);
+}
+
+/* ---------------- Player ---------------- */
+const player = {
+  lane: 0,
+  y: 0,     // height above ground
+  vy: 0,
+  onGround: true,
+  duck: false,
+};
+
+const PHYS = {
+  gravity: -2600,
+  jumpV: 920,
+  duckScale: 0.65,
+  holdFactor: 0.35,
+  maxHold: 0.18
+};
+
+let jumpHeld = false;
+let holdT = PHYS.maxHold;
+
+/* ---------------- Speed ---------------- */
+const SPEED = { start: 85, max: 320, curve: 0.030 };
+
+let running = false;
+let gameStartedOnce = false;
+let lastT = performance.now();
+let tStart = 0;
+
+function currentSpeed(){
+  const sec = (performance.now() - tStart) / 1000;
+  const t = 1 - Math.exp(-SPEED.curve * sec);
+  return lerp(SPEED.start, SPEED.max, t);
+}
+
+/* ---------------- Objects ---------------- */
+const TYPE = {
+  COIN: "coin",
+  SHIELD: "shield",
+  SMALL: "small",
+  BIG: "big",
+  ARCH: "arch",
+  ITEM: "item",
+};
+
+let objects = [];
+let invTime = 0;
+let score = 0;
+
+/* ---------------- Items (4) ---------------- */
+const GOAL_ITEMS = 4;
+let gotItems = new Set();
+let itemQueue = [0,1,2,3];
+let itemActive = null;
+let nextItemTime = 7.0;
+
+function scheduleNextItemNormal(nowSec){
+  nextItemTime = nowSec + (12 + Math.random()*10);
+}
+function scheduleNextItemSoon(nowSec){
+  nextItemTime = nowSec + (3.5 + Math.random()*3.0);
+}
+function spawnItem(itemId){
+  const lane = LANES[(Math.random()*3)|0];
+  const obj = { type: TYPE.ITEM, lane, p: -0.25, size: 66, taken:false, itemId };
+  objects.push(obj);
+  itemActive = obj;
+}
+
+/* ---------------- Spawning ---------------- */
+const WARMUP_TIME = 5.0;
+
+let obstacleTimer = 0;
+let coinTimer = 0;
+
+let coinTrain = null;
+let bigChain = null;
+
+function startCoinTrain(){
+  coinTrain = {
+    lane: LANES[(Math.random()*3)|0],
+    left: 6 + ((Math.random()*6)|0), // fewer coins
+    stepSpawn: 0.08,
+    spawnP: -0.25
+  };
+}
+function spawnCoinFromTrain(){
+  if (!coinTrain) return;
+
+  if (Math.random() < 0.16){
+    const dir = Math.random()<0.5 ? -1 : 1;
+    coinTrain.lane = clamp(coinTrain.lane + dir, -1, 1);
+  }
+
+  objects.push({ type: TYPE.COIN, lane: coinTrain.lane, p: coinTrain.spawnP, size: 34, taken:false });
+
+  coinTrain.spawnP -= coinTrain.stepSpawn;
+  coinTrain.left--;
+  if (coinTrain.left <= 0) coinTrain = null;
+}
+function spawnShield(){
+  objects.push({ type: TYPE.SHIELD, lane: LANES[(Math.random()*3)|0], p: -0.25, size: 44, taken:false });
+}
+
+function difficultyT(){
+  const sec = (performance.now() - tStart) / 1000;
+  return clamp(sec / 85, 0, 1);
+}
+function maybeStartBigChain(){
+  if (bigChain) return;
+  if (Math.random() < 0.10){
+    bigChain = { lane: LANES[(Math.random()*3)|0], left: 2 + ((Math.random()*2)|0) }; // 2..3
+  }
+}
+function spawnObstacleRow(){
+  const t = difficultyT();
+  maybeStartBigChain();
+
+  // fewer double blocks; never 3
+  const blockCount = Math.random() < 0.90 ? 1 : 2;
+  const pool = [-1,0,1];
+  const blocked = [];
+  while (blocked.length < blockCount){
+    const i = (Math.random()*pool.length)|0;
+    blocked.push(pool.splice(i,1)[0]);
+  }
+
+  if (bigChain && !blocked.includes(bigChain.lane)){
+    blocked[0] = bigChain.lane;
+  }
+
+  for (const lane of blocked){
+    let type;
+
+    if (bigChain && lane === bigChain.lane){
+      type = TYPE.BIG;
+    } else {
+      const bigChance = lerp(0.05, 0.12, t);
+      const r = Math.random();
+      if (r < 0.58) type = TYPE.SMALL;
+      else if (r < 0.58 + bigChance) type = TYPE.BIG;
+      else type = TYPE.ARCH;
+    }
+
+    objects.push({
+      type,
+      lane,
+      p: -0.25,
+      size: (type === TYPE.BIG) ? 118 : 76,
+      taken:false
+    });
+  }
+
+  if (bigChain){
+    bigChain.left--;
+    if (bigChain.left <= 0) bigChain = null;
+  }
+
+  if (!coinTrain && Math.random() < 0.45) startCoinTrain();
+  if (Math.random() < 0.10) spawnShield();
+}
+
+/* ---------------- Draw helpers ---------------- */
+function drawCoin(x,y,r,spin){
+  r = Math.max(0.5, r);
+  const w = Math.max(0.5, r * (0.35 + 0.65*Math.abs(Math.cos(spin))));
+
+  ctx.save();
+  ctx.translate(x,y);
+
+  ctx.fillStyle = "rgba(255,230,120,0.14)";
+  ctx.beginPath();
+  ctx.ellipse(0,0,Math.max(0.5,r*1.05),Math.max(0.5,r*0.75),0,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(255,230,120,0.28)";
+  ctx.beginPath();
+  ctx.ellipse(0,0,w,Math.max(0.5,r*0.78),0,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(255,210,90,0.55)";
+  ctx.beginPath();
+  ctx.ellipse(0,0,Math.max(0.5,w*0.92),Math.max(0.5,r*0.62),0,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(255,255,255,0.18)";
+  ctx.beginPath();
+  ctx.ellipse(-w*0.18,-r*0.12,Math.max(0.5,w*0.35),Math.max(0.5,r*0.25),0,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.restore();
+}
+function drawShieldIcon(x,y,r){
+  r = Math.max(0.5, r);
+  ctx.save();
+  ctx.translate(x,y);
+
+  ctx.fillStyle = "rgba(120,220,255,0.22)";
+  ctx.beginPath();
+  ctx.moveTo(0,-r);
+  ctx.quadraticCurveTo(r*0.9,-r*0.6,r*0.65,0);
+  ctx.quadraticCurveTo(r*0.2,r*0.9,0,r);
+  ctx.quadraticCurveTo(-r*0.2,r*0.9,-r*0.65,0);
+  ctx.quadraticCurveTo(-r*0.9,-r*0.6,0,-r);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.strokeStyle = "rgba(180,240,255,0.35)";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+/* ---------------- Hitboxes ---------------- */
+// Player: draw box + base-only hitbox
+const HIT = {
+  playerHitW: 0.55,
+  playerHitH: 0.38,
+  smallHitW: 0.62,
+  smallHitH: 0.34,
+  bigPadX: 0.10,
+  bigPadTop: 0.08,
+  bigPadBottom: 0.02
+};
+
+function getPlayerBoxes(){
+  const anchorY = W.h * PLAYER_ANCHOR_Y;
+  const px = laneX(player.lane, 1.0);
+
+  const duckScale = (player.duck && player.onGround) ? PHYS.duckScale : 1;
+
+  const drawW = W.w * 0.18 * duckScale;
+  const drawH = W.w * 0.26 * duckScale;
+
+  const drawX = px - drawW/2;
+  const drawY = anchorY - drawH - player.y;
+
+  const hitW = drawW * HIT.playerHitW;
+  const hitH = drawH * HIT.playerHitH;
+  const hitX = drawX + (drawW - hitW)/2;
+  const hitY = drawY + drawH - hitH;
+
+  return {
+    draw: { x: drawX, y: drawY, w: drawW, h: drawH },
+    hit:  { x: hitX, y: hitY, w: hitW, h: hitH }
+  };
+}
+
+function asteroidHitboxRect(o, ob){
+  // ob = sprite bbox
+  if (o.type === TYPE.BIG){
+    const padX = ob.w * HIT.bigPadX;
+    const padTop = ob.h * HIT.bigPadTop;
+    const padBottom = ob.h * HIT.bigPadBottom;
+    return {
+      x: ob.x + padX,
+      y: ob.y + padTop,
+      w: ob.w - padX*2,
+      h: ob.h - padTop - padBottom
+    };
+  }
+
+  // SMALL base-only
+  const hitW = ob.w * HIT.smallHitW;
+  const hitH = ob.h * HIT.smallHitH;
+  return {
+    x: ob.x + (ob.w - hitW)/2,
+    y: ob.y + ob.h - hitH,
+    w: hitW,
+    h: hitH
+  };
+}
+
+function rects(a,b){
+  return a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y;
+}
+
+/* ---------------- Controls ---------------- */
+window.addEventListener("keydown", (e)=>{
+  if (["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"," ","Enter"].includes(e.key)) e.preventDefault();
+
+  if (e.key === "ArrowLeft") player.lane = clamp(player.lane - 1, -1, 1);
+  if (e.key === "ArrowRight") player.lane = clamp(player.lane + 1, -1, 1);
+
+  if (e.key === "ArrowUp"){
+    if (!jumpHeld){
+      jumpHeld = true;
+      tryJump();
+    }
+  }
+  if (e.key === "ArrowDown") player.duck = true;
+
+  if (e.key === " "){
+    activateInvincibility();
+  }
+
+  if (e.key === "Enter"){
+    const losingVisible = loseScreen && !loseScreen.classList.contains("hidden");
+    if (losingVisible) startRun();
+  }
+},{passive:false});
+
+window.addEventListener("keyup", (e)=>{
+  if (e.key === "ArrowUp"){
+    jumpHeld = false;
+    holdT = PHYS.maxHold;
+  }
+  if (e.key === "ArrowDown") player.duck = false;
+});
+
+function tryJump(){
+  if (!running) return;
+  if (!player.onGround) return;
+  player.vy = PHYS.jumpV;
+  player.onGround = false;
+  holdT = 0;
+}
+
+function activateInvincibility(){
+  if (!running) return;
+  if (invTime > 0) return;
+  if (save.shields <= 0) return;
+  save.shields -= 1;
+  saveNow();
+  refreshHUD();
+  invTime = 10.0;
+}
+
+/* ---------------- Game flow ---------------- */
+function showBriefing(){
+  if (briefing) briefing.classList.remove("hidden");
+  if (loseScreen) loseScreen.classList.add("hidden");
+  if (shopScreen) shopScreen.classList.add("hidden");
+  running = false;
+}
+function lose(msg){
+  running = false;
+  if (loseText) loseText.textContent = msg || "Collision.";
+  if (loseScreen) loseScreen.classList.remove("hidden");
+}
+function resetGame(){
+  objects = [];
+  obstacleTimer = 0;
+  coinTimer = 0;
+  coinTrain = null;
+  bigChain = null;
+
+  player.lane = 0;
+  player.y = 0;
+  player.vy = 0;
+  player.onGround = true;
+  player.duck = false;
+
+  jumpHeld = false;
+  holdT = PHYS.maxHold;
+
+  invTime = 0;
+  score = 0;
+
+  gotItems = new Set();
+  itemQueue = [0,1,2,3];
+  itemActive = null;
+  nextItemTime = 7.0;
+
+  startCoinTrain();
+
+  refreshHUD();
+  if (invEl) invEl.textContent = "0";
+  if (scoreEl) scoreEl.textContent = "0";
+}
+function startRun(){
+  if (briefing) briefing.classList.add("hidden");
+  if (loseScreen) loseScreen.classList.add("hidden");
+  if (shopScreen) shopScreen.classList.add("hidden");
+
+  resetGame();
+  running = true;
+  gameStartedOnce = true;
+  lastT = performance.now();
+  tStart = performance.now();
+  requestAnimationFrame(loop);
+}
+if (startBtn) startBtn.addEventListener("click", startRun);
+if (restartLose) restartLose.addEventListener("click", startRun);
+
+/* ---------------- Update ---------------- */
+function update(dt){
+  const sec = (performance.now() - tStart) / 1000;
+  const warmup = sec < WARMUP_TIME;
+
+  score = Math.floor(sec * 9);
+  if (scoreEl) scoreEl.textContent = String(score);
+
+  if (invTime > 0) invTime = Math.max(0, invTime - dt);
+  if (invEl) invEl.textContent = String(Math.ceil(invTime));
+
+  // jump physics (hold extends ascent)
+  let g = PHYS.gravity;
+  if (!player.onGround && jumpHeld && holdT < PHYS.maxHold && player.vy > 0){
+    g = PHYS.gravity * PHYS.holdFactor;
+    holdT += dt;
+  } else if (!player.onGround){
+    holdT = PHYS.maxHold;
+  }
+
+  player.vy += g * dt;
+  player.y += player.vy * dt;
+
+  if (player.y <= 0){
+    player.y = 0;
+    player.vy = 0;
+    player.onGround = true;
+  } else {
+    player.onGround = false;
+  }
+
+  const speed = currentSpeed();
+  const speedFactor = clamp(speed / SPEED.start, 1, 3);
+
+  // fewer coins
+  coinTimer += dt;
+  if (coinTimer >= 0.12){
+    coinTimer = 0;
+    if (!coinTrain && Math.random() < (warmup ? 0.45 : 0.18)){
+      startCoinTrain();
+    }
+    if (coinTrain) spawnCoinFromTrain();
+  }
+
+  // fewer obstacles
+  if (!warmup){
+    obstacleTimer += dt;
+    const t = difficultyT();
+    const interval = lerp(1.70, 1.15, t);
+    if (obstacleTimer >= interval){
+      obstacleTimer = 0;
+      spawnObstacleRow();
+    }
+  }
+
+  // items
+  if (!itemActive && itemQueue.length > 0 && sec >= nextItemTime){
+    const id = itemQueue.shift();
+    spawnItem(id);
+  }
+
+  // move objects down
+  const dp = (speed * dt) / (W.h * 1.30);
+  for (const o of objects) o.p += dp;
+
+  // collisions
+  const pb = getPlayerBoxes().hit;
+
+  for (const o of objects){
+    if (o.taken) continue;
+    if (o.p < 0.0 || o.p > 1.05) continue;
+
+    const sc = scaleAt(o.p);
+    const x = laneX(o.lane, o.p);
+    const y = yAt(o.p);
+
+    const size = o.size * sc;
+    if (!Number.isFinite(size) || size <= 0) continue;
+    if (size < 8) continue;
+
+    const ob = { x: x - size/2, y: y - size, w: size, h: size };
+
+    // pickups use full bbox
+    if (o.type === TYPE.COIN || o.type === TYPE.SHIELD || o.type === TYPE.ITEM){
+      if (!rects(pb, ob)) continue;
+
+      if (o.type === TYPE.COIN){
+        o.taken = true;
+        save.coins += 1;
+        saveNow();
+        refreshHUD();
+        continue;
+      }
+      if (o.type === TYPE.SHIELD){
+        o.taken = true;
+        save.shields += 1;
+        saveNow();
+        refreshHUD();
+        continue;
+      }
+      if (o.type === TYPE.ITEM){
+        o.taken = true;
+        itemActive = null;
+        gotItems.add(o.itemId);
+
+        if (gotItems.size >= GOAL_ITEMS){
+          running = false;
+          if (loseText) loseText.textContent = "✅ Mission réussie : 4 items récupérés !";
+          if (loseScreen) loseScreen.classList.remove("hidden");
+          return;
+        }
+        scheduleNextItemNormal(sec);
+        continue;
+      }
+    }
+
+    // obstacles with custom hitboxes
+    if (o.type === TYPE.SMALL || o.type === TYPE.BIG){
+      const hb = asteroidHitboxRect(o, ob);
+      if (!rects(pb, hb)) continue;
+
+      if (invTime > 0){
+        o.taken = true;
+        continue;
+      }
+
+      if (o.type === TYPE.SMALL){
+  // ✅ si le bas de la hitbox de la fusée est au-dessus du haut de la hitbox astéroïde => tu passes
+  const passedOver = (pb.y + pb.h) <= (hb.y + hb.h * 0.15);
+
+  if (passedOver) continue;
+
+  lose("Astéroïde !");
+  return;
+}
+
+      // BIG always blocks
+      lose("Gros astéroïde !");
+      return;
+    }
+
+    if (o.type === TYPE.ARCH){
+      if (!rects(pb, ob)) continue;
+      if (invTime > 0){
+        o.taken = true;
+        continue;
+      }
+      if (player.duck && player.onGround) continue;
+      lose("Baisse-toi !");
+      return;
+    }
+  }
+
+  // cleanup bottom (fast)
+  for (const o of objects){
+    if (o.taken) continue;
+    if (o.p >= 1.02){
+      if (o.type === TYPE.ITEM && itemActive === o){
+        itemQueue.unshift(o.itemId);
+        itemActive = null;
+        scheduleNextItemSoon(sec);
+      }
+      o.taken = true;
+    }
+  }
+  objects = objects.filter(o => !o.taken);
+
+  updateStars(dt, speedFactor);
+}
+
+/* ---------------- Draw ---------------- */
+function draw(){
+  ctx.clearRect(0,0,W.w,W.h);
+
+  for (const st of stars){
+    ctx.fillStyle = `rgba(255,255,255,${st.a})`;
+    ctx.fillRect(st.x, st.y, st.s, st.s);
+  }
+
+  drawTrack();
+
+  const sorted = [...objects].sort((a,b)=>a.p-b.p);
+
+  // depth: when in air, rocket is "further" => more objects drawn in front of it
+  const inAir = (!player.onGround || player.y > 1);
+  const playerDepth = inAir ? 0.86 : 0.94;
+
+  // far objects
+  for (const o of sorted){
+    if (o.p >= playerDepth) break;
+    drawObject(o);
+  }
+
+  // player
+  drawPlayer();
+
+  // near objects (in front)
+  for (const o of sorted){
+    if (o.p < playerDepth) continue;
+    drawObject(o);
+  }
+
+  if (invTime > 0){
+    ctx.fillStyle = "rgba(120,220,255,0.08)";
+    ctx.fillRect(0,0,W.w,W.h);
+  }
+}
+
+function drawTrack(){
+  const horizonY = W.h*TRACK.horizonY;
+  const baseY = W.h*TRACK.baseY;
+
+  const topHW = W.w*TRACK.topHalfWidth;
+  const baseHW = W.w*TRACK.baseHalfWidth;
+
+  ctx.strokeStyle = "rgba(255,255,255,0.12)";
+  ctx.lineWidth = 2;
+
+  ctx.beginPath();
+  ctx.moveTo(W.w*0.5 - baseHW, baseY);
+  ctx.lineTo(W.w*0.5 - topHW, horizonY);
+  ctx.lineTo(W.w*0.5 + topHW, horizonY);
+  ctx.lineTo(W.w*0.5 + baseHW, baseY);
+  ctx.closePath();
+  ctx.stroke();
+
+  for (const k of [-1/3, 1/3]){
+    ctx.strokeStyle = "rgba(255,255,255,0.10)";
+    ctx.beginPath();
+    ctx.moveTo(W.w*0.5 + (baseHW*k), baseY);
+    ctx.lineTo(W.w*0.5 + (topHW*k), horizonY);
+    ctx.stroke();
+  }
+
+  const speedFactor = clamp(currentSpeed()/SPEED.start, 1, 3);
+  ctx.strokeStyle = "rgba(255,255,255,0.10)";
+  ctx.lineWidth = 2;
+
+  const count = 11;
+  const tt = performance.now()*0.0018*speedFactor;
+  for (let i=0;i<count;i++){
+    const p = ((i/count) + (tt%1)) % 1;
+    const y = yAt(p);
+    const w = lerp(W.w*0.08, W.w*0.44, p);
+    ctx.beginPath();
+    ctx.moveTo(W.w*0.5 - w*0.5, y);
+    ctx.lineTo(W.w*0.5 + w*0.5, y);
+    ctx.stroke();
+  }
+}
+
+function drawObject(o){
+  const sc = scaleAt(o.p);
+  const x = laneX(o.lane, o.p);
+  const y = yAt(o.p);
+
+  const size = o.size * sc;
+  if (!Number.isFinite(size) || size <= 0) return;
+
+  const ox = x - size/2;
+  const oy = y - size;
+
+  if (o.type === TYPE.COIN){
+    drawCoin(x, y - size*0.50, size*0.34, performance.now()*0.006 + o.p*7);
+    return;
+  }
+
+  if (o.type === TYPE.SHIELD){
+    drawShieldIcon(x, y - size*0.52, size*0.32);
+    return;
+  }
+
+  if (o.type === TYPE.ITEM){
+    const img = itemImgs[o.itemId];
+    if (img && img.complete && img.naturalWidth){
+      ctx.drawImage(img, ox, oy, size, size);
+    } else {
+      ctx.fillStyle = "rgba(255,255,255,0.20)";
+      ctx.fillRect(ox, oy, size, size);
+    }
+    return;
+  }
+
+  if (o.type === TYPE.SMALL || o.type === TYPE.BIG){
+    if (imgAst.complete && imgAst.naturalWidth){
+      ctx.drawImage(imgAst, ox, oy, size, size);
+    } else {
+      ctx.fillStyle = "rgba(255,255,255,0.22)";
+      ctx.fillRect(ox, oy, size, size);
+    }
+    return;
+  }
+
+  if (o.type === TYPE.ARCH){
+    ctx.fillStyle = "rgba(255,255,255,0.14)";
+    ctx.fillRect(ox, oy + size*0.30, size, size*0.18);
+
+    ctx.fillStyle = "rgba(255,255,255,0.18)";
+    ctx.fillRect(ox, oy + size*0.30, size*0.18, size*0.70);
+    ctx.fillRect(ox + size*0.82, oy + size*0.30, size*0.18, size*0.70);
+  }
+}
+
+/* ---------------- Player draw (jump animation) ---------------- */
+function drawPlayer(){
+  const boxes = getPlayerBoxes();
+  const drawB = boxes.draw;
+
+  const inAir = (!player.onGround || player.y > 1);
+
+  // ✅ in air => rocket.png flames (same hitbox)
+  // ✅ on ground => equipped skin (default rocket2)
+  let img = null;
+  if (inAir) {
+    img = imgRocketFlame;
+  } else {
+    const skinId = save.equippedSkin || "rocket2";
+    img = skinImgs.get(skinId) || imgRocketBase;
+  }
+
+  if (img && img.complete && img.naturalWidth){
+    ctx.drawImage(img, drawB.x, drawB.y, drawB.w, drawB.h);
+  } else {
+    ctx.fillStyle = "rgba(255,255,255,0.25)";
+    ctx.fillRect(drawB.x, drawB.y, drawB.w, drawB.h);
+  }
+}
+
+/* ---------------- Loop ---------------- */
+function loop(t){
+  if (!running) return;
+  const dt = Math.min(0.033, Math.max(0.001, (t - lastT) / 1000));
+  lastT = t;
+
+  update(dt);
+  draw();
+
+  requestAnimationFrame(loop);
+}
+
+/* ---------------- Init ---------------- */
+resize();
+initStars();
+refreshHUD();
+showBriefing();

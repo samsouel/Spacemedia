@@ -1,0 +1,132 @@
+/* ✅ autorise le scroll */
+html, body{
+  margin: 0;
+  height: 100%;
+  background: radial-gradient(circle at 50% 20%, #0b1230, #050814 60%, #03040a);
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+  color: white;
+  overflow-y: auto;     /* ✅ scroll */
+  overflow-x: hidden;
+}
+
+@font-face {
+  font-family: "SpaceMedia";
+  src: url("assets/font/Ethnocentric-Regular.otf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+}
+
+/* le titre peut rester en haut, mais en "sticky" (meilleur que fixed pour scroll) */
+.top{
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: center;
+  padding-top: calc(env(safe-area-inset-top) + 8px);
+  padding-bottom: 10px;
+  background: linear-gradient(to bottom, rgba(5,8,20,0.95), rgba(5,8,20,0));
+  backdrop-filter: blur(6px);
+}
+
+/* ton image titre */
+.titleImg{
+  width: min(92vw, 520px);
+  max-height: 22vh;
+  height: auto;
+  object-fit: contain;
+  display: block;
+}
+
+/* ✅ conteneur grille centré + scroll-friendly */
+.space{
+  min-height: calc(100svh - 120px); /* laisse place au header */
+  display: grid;
+  grid-template-columns: repeat(2, 1fr); /* ✅ 2 colonnes */
+  gap: 18px 22px; /* ✅ plus proche (ligne / colonne) */
+
+  padding: 18px 7vw 28px; /* ✅ respirer + bas visible */
+  max-width: 820px;       /* ✅ centré sur desktop */
+  margin: 0 auto;         /* ✅ centré horizontalement */
+  align-content: center;  /* ✅ centré verticalement si assez de place */
+  justify-items: center;
+}
+
+/* planète + texte dessous */
+.planet{
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  touch-action: manipulation; /* ✅ autorise scroll + tap */
+}
+
+.planet img{
+  width: min(42vw, 240px); /* ✅ plus grand en mobile */
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 12px 20px rgba(0,0,0,0.45));
+  transition: transform 0.15s ease;
+}
+
+.planet:active img,
+.planet:hover img{
+  transform: scale(1.04);
+}
+
+.label{
+  margin-top: 0px;
+  padding: 0;               /* ✅ plus de zone */
+  background: none;         /* ✅ plus de zone */
+  border: none;             /* ✅ plus de zone */
+  backdrop-filter: none;    /* ✅ plus de zone */
+
+  font-family: "SpaceMedia", system-ui, sans-serif; /* ✅ ta police */
+  font-size: 16px;          /* ajuste si besoin */
+  font-weight: 400;         /* selon ta police */
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+
+  color: #ffffff;           /* ✅ visible */
+  text-align: center;
+}
+
+
+/* Desktop: 3 colonnes / 2 lignes */
+@media (min-width: 900px){
+  .space{
+    grid-template-columns: repeat(3, 1fr);
+    gap: 26px 34px;
+    padding: 24px 10vw 40px;
+  }
+  .planet img{
+    width: min(16vw, 220px);
+  }
+}
+
+
+
+.multimedia .tag{
+  position: absolute;
+  left: 50%;
+  bottom: -14px;
+  transform: translateX(-50%);
+  font-size: 12px;
+  background: rgba(0,0,0,0.45);
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.18);
+  backdrop-filter: blur(6px);
+}
+
+/* Positions (à ajuster pour matcher ton image) */
+.p1{ left: 18%; top: 28%; }
+.p2{ left: 52%; top: 26%; }
+.p3{ left: 82%; top: 34%; }
+.p4{ left: 30%; top: 62%; } /* multimedia */
+.p5{ left: 60%; top: 66%; }
+.p6{ left: 84%; top: 72%; }

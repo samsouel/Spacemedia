@@ -1,0 +1,119 @@
+html, body{
+  margin:0;
+  height:100%;
+  background:#050814;
+  color:#fff;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+}
+
+.page{
+  height:100%;
+  display:flex;
+  flex-direction:column;
+}
+
+.topbar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  padding:12px 14px;
+  background: rgba(0,0,0,0.35);
+  border-bottom:1px solid rgba(255,255,255,0.12);
+}
+
+.hud{
+  display:flex;
+  gap:16px;
+  font-weight:900;
+  flex-wrap:wrap;
+}
+
+.actions{
+  display:flex;
+  gap:10px;
+}
+
+.btn{
+  border:1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.06);
+  color:#fff;
+  padding:10px 12px;
+  cursor:pointer;
+  font-weight:900;
+}
+
+.btn.primary{
+  border:0;
+  background: rgba(255,255,255,0.92);
+  color:#050814;
+}
+
+.stage{
+  flex:1;
+  display:grid;
+  place-items:center;
+  padding:14px;
+  position:relative;
+}
+
+#game{
+  width:min(1000px, 96vw);
+  height:min(720px, 78vh);
+  background: radial-gradient(circle at 50% 25%, #0b1230, #050814 65%, #03040a);
+  border:2px solid rgba(255,255,255,0.12);
+  box-shadow: 0 20px 80px rgba(0,0,0,0.65);
+  display:block;
+}
+
+.overlay{
+  position:absolute;
+  inset:0;
+  display:grid;
+  place-items:center;
+  background: rgba(0,0,0,0.55);
+}
+
+.hidden{ display:none; }
+
+.card{
+  width:min(720px, 92vw);
+  padding:18px;
+  text-align:center;
+  background: rgba(10, 14, 28, 0.95);
+  border: 1px solid rgba(255,255,255,0.12);
+}
+
+.hint{
+  padding:10px 14px;
+  opacity:0.8;
+  font-size:13px;
+  border-top:1px solid rgba(255,255,255,0.10);
+}
+
+/* End viewer */
+.endItemImg{
+  width: min(240px, 45vw);
+  height: auto;
+  display:block;
+  margin: 14px auto 10px;
+  filter: drop-shadow(0 14px 24px rgba(0,0,0,0.55));
+}
+.endItemName{
+  margin: 6px 0 0;
+  font-size: 18px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.endItemText{
+  margin: 10px 0 12px;
+  opacity: 0.95;
+  line-height: 1.35;
+}
+.endRow{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:12px;
+  margin-bottom: 10px;
+}
