@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Menu - Planètes</title>
+  <link rel="stylesheet" href="menu.css" />
+</head>
+<body>
+  <header class="top">
+    <!-- Soit tu mets un titre texte, soit une image PNG -->
+     <img
+    src="assets/title.png"
+    alt="Titre du jeu"
+    class="titleImg"
+  />
+    <!-- <img class="titleImg" src="assets/title.png" alt="Titre" /> -->
+  </header>
+
+  <main class="space">
+    <!-- Les 6 planètes (PNG). La planète "multimedia" a data-level -->
+    <button class="planet p1" aria-label="Planète administration" data-level="administration/level-admin.html">
+      <img src="assets/planets/administration.png" alt="" />
+      <span class="label">administration & economie d'entreprise</span>
+      
+    </button>
+
+    <button class="planet p2" aria-label="Planète design & conception" data-level="Design et conception/level-design.html">
+      <img src="assets/planets/Conceptiondesign.png" alt="" />
+      <span class="label">design & conception</span>
+    </button>
+
+    <button class="planet p3" aria-label="Planète Gestion de projet" data-level="Gestion de projet/level-gestion.html">
+      <img src="assets/planets/gestionprojet.png" alt="" />
+      <span class="label">gestion de projets</span>
+    </button>
+
+    <!-- Multimedia -->
+    <button class="planet p4 multimedia" aria-label="Planète Multimedia" data-level="Multimedia/level-multimedia.html">
+      <img src="assets/planets/multimedia.png" alt="" />
+      <span class="label">multimedia</span>
+    </button>
+
+    <button class="planet p5" aria-label="Planète informatique" data-level="informatique/level-informatique.html">
+      <img src="assets/planets/informatique.png" alt="" />
+      <span class="label">informatique</span>
+    </button>
+
+    <button class="planet p6" aria-label="Planète Marketing" data-level="Marketing/marketing.html">
+      <img src="assets/planets/Marketincomm.png" alt="" />
+      <span class="label">Marketing & communication</span>
+    </button>
+  </main>
+
+  <script src="menu.js"></script>
+</body>
+</html>

@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Niveau - Space Shooter</title>
+  <link rel="stylesheet" href="gestion.css" />
+</head>
+
+<body>
+  <div class="stage">
+    <div class="phoneFrame" id="frame">
+      <canvas id="game"></canvas>
+
+      <div class="hud">
+        <div class="hudLeft">
+          <div>Items: <span id="got">0</span>/4</div>
+          <div>Astéroïdes: <span id="kills">0</span></div>
+          <div>Temps: <span id="time">0</span>s</div>
+        </div>
+        <button class="hudBtn" id="back" type="button">← Menu</button>
+      </div>
+
+      <!-- Briefing -->
+      <div class="overlay" id="briefing">
+        <div class="card">
+          <h1>Mission : Récupérer les 4 items</h1>
+          <p>
+            Déplace le vaisseau avec les flèches gauche / droite. Détruis les astéroïdes
+            avec tes missiles. Ramasse les bonus pour augmenter la cadence de tir (niveau 4 max).
+          </p>
+          <button class="primaryBtn" id="startMission" type="button">Commencer</button>
+        </div>
+      </div>
+
+      <!-- Lose -->
+      <div class="overlay hidden" id="loseScreen">
+        <div class="card">
+          <h1>Échec de la mission</h1>
+          <p>Ton vaisseau a été détruit.</p>
+          <button class="primaryBtn" id="restartLose" type="button">Rejouer</button>
+        </div>
+      </div>
+
+      <!-- Win debrief -->
+      <div class="overlay hidden" id="endScreen">
+        <div class="card">
+          <h1 id="endTitle">Mission réussie</h1>
+
+          <img id="endItemImg" class="endItemImg" alt="" />
+          <h2 id="endItemName" class="endItemName"></h2>
+          <p id="endItemText" class="endItemText"></p>
+
+          <div class="endRow">
+            <button class="secondaryBtn" id="endPrev" type="button">◀</button>
+            <span id="endCounter"></span>
+            <button class="secondaryBtn" id="endNext" type="button">▶</button>
+          </div>
+
+          <button class="primaryBtn" id="restartWin" type="button">Rejouer</button>
+        </div>
+      </div>
+
+      <!-- mobile fire -->
+      <button class="fireBtn" id="fireBtn" type="button">TIR</button>
+    </div>
+  </div>
+
+  <script src="gestion.js"></script>
+</body>
+</html>
